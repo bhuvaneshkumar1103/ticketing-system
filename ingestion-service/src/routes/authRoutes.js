@@ -53,11 +53,14 @@ const { authorize } = require('../middleware/auth');
 
 // GET /api/users/me
 // Returns the decoded token data (role, city, state)
-router.get('/me', authorize(['CMR', 'MANUFACTURER', 'ADMIN']), (req, res) => {
+router.get('/me', authorize(['CMR', 'MANUFACTURER', 'ADMIN']), async (req, res) => {
     // req.user was populated by the authorize middleware
+    const user = await User.findOne({ 
+                _id: req.user.id, 
+            });
     res.json({
         success: true,
-        user: req.user 
+        user: user 
     });
 });
 module.exports = router;

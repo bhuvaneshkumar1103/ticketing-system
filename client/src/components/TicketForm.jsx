@@ -127,21 +127,32 @@ const TicketForm = () => {
            </div>
            <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Ticket ID</label>
-              <input type="text" value={formData.ticket_id || ''} onChange={(e) => setFormData({...formData, ticket_id: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" />
+              <input type="text" disabled value={formData.ticket_id || ''} onChange={(e) => setFormData({...formData, ticket_id: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" />
            </div>
            <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase ml-1">IMEI No</label>
-              <input type="text" value={formData.imei_no || ''} onChange={(e) => setFormData({...formData, imei_no: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" />
+              <input disabled={isManufacturer} type="text" value={formData.imei_no || ''} onChange={(e) => setFormData({...formData, imei_no: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100" />
            </div>
            <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Status</label>
               <select value={formData.status || 'OPEN'} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm outline-none cursor-pointer">
-                 <option value="OPEN">Open</option>
-                 <option value="CMR_REVIEW">CMR Review</option>
-                 <option value="IN_ANALYSIS">In Analysis</option>
-                 <option value="MANUFACTURER_ANALYSIS">Manufacturer Analysis</option>
-                 <option value="RESOLVED">Resolved</option>
-                 <option value="CLOSED">Closed</option>
+                 {isManufacturer ? (
+                    // Manufacturer Restricted View
+                    <>
+                      <option value="MANUFACTURER_ANALYSIS">Manufacturer Analysis</option>
+                      <option value="RESOLVED">Resolved</option>
+                    </>
+                  ) : (
+                    // Admin / CMR Full View
+                    <>
+                      <option value="OPEN">Open</option>
+                      <option value="CMR_REVIEW">CMR Review</option>
+                      <option value="IN_ANALYSIS">In Analysis</option>
+                      <option value="MANUFACTURER_ANALYSIS">Manufacturer Analysis</option>
+                      <option value="RESOLVED">Resolved</option>
+                      <option value="CLOSED">Closed</option>
+                    </>
+                  )}
               </select>
            </div>
         </div>
@@ -173,7 +184,7 @@ const TicketForm = () => {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="md:col-span-2 space-y-2">
                  <label className="text-[10px] font-black text-rose-400 uppercase ml-1">Master Error Message</label>
-                 <input value={formData.error_data.error_message || ''} onChange={(e) => updateNested('error_data.error_message', e.target.value)} className="w-full px-5 py-4 bg-white border border-rose-100 rounded-2xl text-base font-semibold outline-none focus:ring-4 focus:ring-rose-50" />
+                 <input value={formData.error_data.error_message || ''} disabled={isManufacturer} onChange={(e) => updateNested('error_data.error_message', e.target.value)} className="w-full px-5 py-4 bg-white border border-rose-100 rounded-2xl text-base font-semibold outline-none focus:ring-4 focus:ring-rose-50" />
               </div>
 
               {/* Mismatched Fields (Object) */}
@@ -182,8 +193,8 @@ const TicketForm = () => {
                  {Object.entries(formData.error_data.mismatched_fields || {}).map(([key, val]) => (
                    <div key={key} className="flex gap-2">
                       <div className="w-1/3 px-4 py-2 bg-rose-100/30 text-[10px] font-bold text-rose-600 rounded-lg flex items-center capitalize truncate">{key.replace(/_/g, ' ')}</div>
-                      <input value={val || ''} onChange={(e) => updateNested(`error_data.mismatched_fields.${key}`, e.target.value)} className="w-2/3 px-4 py-2 bg-white border border-rose-100 rounded-lg text-sm outline-none" />
-                      <button type="button" onClick={() => {
+                      <input value={val || ''} disabled={isManufacturer} onChange={(e) => updateNested(`error_data.mismatched_fields.${key}`, e.target.value)} className="w-2/3 px-4 py-2 bg-white border border-rose-100 rounded-lg text-sm outline-none" />
+                      <button type="button" disabled={isManufacturer} onClick={() => {
                         const next = {...formData.error_data.mismatched_fields};
                         delete next[key];
                         updateNested('error_data.mismatched_fields', next);
@@ -191,9 +202,9 @@ const TicketForm = () => {
                    </div>
                  ))}
                  <div className="flex gap-2 p-2 bg-white rounded-xl border border-dashed border-rose-200">
-                    <input placeholder="New Field" value={newMismatch.key} onChange={e => setNewMismatch({...newMismatch, key: e.target.value})} className="w-1/3 text-xs p-2 outline-none" />
-                    <input placeholder="Value" value={newMismatch.value} onChange={e => setNewMismatch({...newMismatch, value: e.target.value})} className="w-2/3 text-xs p-2 outline-none border-l border-gray-100" />
-                    <button type="button" onClick={addMismatchedField} className="p-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600"><Plus size={16}/></button>
+                    <input placeholder="New Field" disabled={isManufacturer} value={newMismatch.key} onChange={e => setNewMismatch({...newMismatch, key: e.target.value})} className="w-1/3 text-xs p-2 outline-none" />
+                    <input placeholder="Value" disabled={isManufacturer} value={newMismatch.value} onChange={e => setNewMismatch({...newMismatch, value: e.target.value})} className="w-2/3 text-xs p-2 outline-none border-l border-gray-100" />
+                    <button type="button" disabled={isManufacturer} onClick={addMismatchedField} className="p-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600"><Plus size={16}/></button>
                  </div>
               </div>
 
@@ -201,16 +212,16 @@ const TicketForm = () => {
               <div className="space-y-4">
                  <div className="flex justify-between items-center ml-1">
                     <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Missing Fields</label>
-                    <button type="button" onClick={() => updateNested('error_data.missing_fields', [...formData.error_data.missing_fields, ""])} className="text-rose-500 hover:bg-rose-100 p-1 rounded-lg transition-colors"><Plus size={16}/></button>
+                    <button type="button" disabled={isManufacturer} onClick={() => updateNested('error_data.missing_fields', [...formData.error_data.missing_fields, ""])} className="text-rose-500 hover:bg-rose-100 p-1 rounded-lg transition-colors"><Plus size={16}/></button>
                  </div>
                  {formData.error_data.missing_fields?.map((field, idx) => (
                     <div key={idx} className="flex gap-2">
-                      <input value={field || ''} onChange={(e) => {
+                      <input value={field || ''} disabled={isManufacturer} onChange={(e) => {
                         const updated = [...formData.error_data.missing_fields];
                         updated[idx] = e.target.value;
                         updateNested('error_data.missing_fields', updated);
                       }} className="flex-1 px-4 py-2 bg-white border border-rose-100 rounded-lg text-sm outline-none" />
-                      <button type="button" onClick={() => updateNested('error_data.missing_fields', formData.error_data.missing_fields.filter((_, i) => i !== idx))} className="text-rose-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
+                      <button type="button" disabled={isManufacturer} onClick={() => updateNested('error_data.missing_fields', formData.error_data.missing_fields.filter((_, i) => i !== idx))} className="text-rose-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
                     </div>
                  ))}
               </div>
@@ -227,9 +238,9 @@ const TicketForm = () => {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div className="space-y-4">
                  <label className="text-[10px] font-black text-emerald-600 uppercase ml-1">Technical Root Cause</label>
-                 <input value={formData.analysis.root_cause || ''} onChange={(e) => updateNested('analysis.root_cause', e.target.value)} className="w-full px-4 py-3 bg-white border border-emerald-100 rounded-xl text-sm focus:ring-4 focus:ring-emerald-50 outline-none" />
+                 <input value={formData.analysis.root_cause || ''} disabled={isManufacturer} onChange={(e) => updateNested('analysis.root_cause', e.target.value)} className="w-full px-4 py-3 bg-white border border-emerald-100 rounded-xl text-sm focus:ring-4 focus:ring-emerald-50 outline-none" />
                  <label className="text-[10px] font-black text-emerald-600 uppercase ml-1 block mt-4">Resolution Steps</label>
-                 <textarea rows="5" value={formData.analysis.resolution_steps || ''} onChange={(e) => updateNested('analysis.resolution_steps', e.target.value)} className="w-full px-4 py-3 bg-white border border-emerald-100 rounded-xl text-sm italic outline-none" />
+                 <textarea rows="5" disabled={isManufacturer} value={formData.analysis.resolution_steps || ''} onChange={(e) => updateNested('analysis.resolution_steps', e.target.value)} className="w-full px-4 py-3 bg-white border border-emerald-100 rounded-xl text-sm italic outline-none" />
               </div>
 
               {/* Suggested Data (Object) */}
@@ -239,19 +250,19 @@ const TicketForm = () => {
                     <div key={key} className="flex flex-col gap-1 mb-2">
                       <div className="flex justify-between items-center px-1">
                         <span className="text-[9px] font-bold text-gray-400 uppercase">{key.replace(/_/g, ' ')}</span>
-                        <button type="button" onClick={() => {
+                        <button disabled={isManufacturer} type="button" onClick={() => {
                           const next = {...formData.analysis.suggested_data};
                           delete next[key];
                           updateNested('analysis.suggested_data', next);
                         }} className="text-gray-300 hover:text-rose-400"><X size={12}/></button>
                       </div>
-                      <input value={val || ''} onChange={(e) => updateNested(`analysis.suggested_data.${key}`, e.target.value)} className="px-4 py-2 border-b border-gray-100 bg-transparent text-sm focus:border-emerald-400 outline-none transition-all" />
+                      <input disabled={isManufacturer} value={val || ''} onChange={(e) => updateNested(`analysis.suggested_data.${key}`, e.target.value)} className="px-4 py-2 border-b border-gray-100 bg-transparent text-sm focus:border-emerald-400 outline-none transition-all" />
                     </div>
                  ))}
                  <div className="flex gap-2 p-2 bg-white rounded-xl border border-dashed border-emerald-200 mt-4">
                     <input placeholder="Field Name" value={newSuggestion.key} onChange={e => setNewSuggestion({...newSuggestion, key: e.target.value})} className="w-1/2 text-xs p-2 outline-none" />
                     <input placeholder="Suggested Value" value={newSuggestion.value} onChange={e => setNewSuggestion({...newSuggestion, value: e.target.value})} className="w-1/2 text-xs p-2 outline-none" />
-                    <button type="button" onClick={addSuggestedField} className="p-2 bg-emerald-500 text-white rounded-lg"><Plus size={16}/></button>
+                    <button disabled={isManufacturer} type="button" onClick={addSuggestedField} className="p-2 bg-emerald-500 text-white rounded-lg"><Plus size={16}/></button>
                  </div>
               </div>
            </div>

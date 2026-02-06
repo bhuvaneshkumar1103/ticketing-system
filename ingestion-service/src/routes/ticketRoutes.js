@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const Ticket = require('../models/Ticket');
+const Asset = require('../models/Asset');
 const { runTicketAnalysis } = require('../services/analysisService'); // Import the service
 const Counter = require('../models/Counter');
 const { authorize } = require('../middleware/auth');
 
 router.post('/report-error', async (req, res) => {
     try {
+        console.log(req.body);
         const { imei_no, error_message, source, mismatched_fields, missing_fields,status } = req.body;
 
         const counter = await Counter.findOneAndUpdate(
@@ -48,6 +50,53 @@ router.post('/report-error', async (req, res) => {
     }
 });
 
+router.post('/chat-report-error', async (req, res) => {
+    try {
+        console.log(req.body);
+        const { error_message, history} = req.body;
+
+        const counter = await Counter.findOneAndUpdate(
+            { id: 'ticket_id' },
+            { $inc: { seq: 1 } },
+            { new: true, upsert: true }
+        );
+
+        imei_no = "860100000010";
+
+        // 1. Create the initial ticket with status IN_ANALYSIS
+        const newTicket = new Ticket({
+            ticket_id: counter.seq, // Manually assigning the controlled ID
+            imei_no,
+            history,
+            status: 'OPEN', 
+            error_data: {
+                source_website: "Fitter App",
+                error_message: "Error in Fitment App, Kindly Assist",
+                mismatched_fields: {},
+                missing_fields: [],
+                reported_by: "CHAT_BOT"
+            }
+        });
+
+        // 2. Save the ticket (this triggers the auto-increment ID)
+        await newTicket.save();
+
+        // 3. Trigger the Analysis Service (Asynchronous)
+        // We don't use 'await' here if we want to return the response immediately to the RPA bot
+        runTicketAnalysis(newTicket);
+
+        res.status(201).json({
+            success: true,
+            message: "Ticket received and analysis started",
+            ticket_id: newTicket.ticket_id,
+            current_status: newTicket.status
+        });
+
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 /**
  * @POST - Full Ticket Creation.
  * Accepts all fields fr manual UI entry.
@@ -172,13 +221,64 @@ router.get('', authorize(['CMR', 'MANUFACTURER', 'ADMIN']), async (req, res) => 
 
 // 3. READ: Get Single Ticket by Readable ID (ticket_id)
 router.get('/:id', authorize(['CMR', 'MANUFACTURER', 'ADMIN']), async (req, res) => {
-    try {
-        const ticket = await Ticket.findOne({ ticket_id: req.params.id, ...req.accessFilter });
-        if (!ticket) return res.status(404).json({ success: false, message: "Ticket not found" });
-        res.json({ success: true, data: ticket });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+  try {
+    const ticket = await Ticket.findOne({ 
+        ticket_id: req.params.id, 
+        ...req.accessFilter 
+    });
+        
+    if (!ticket) {
+        return res.status(403).json({ error: "Ticket not found or unauthorized" });
     }
+
+    if (req.user && req.user.role === 'MANUFACTURER') {
+      // 1. Fetch Asset profile
+      var asset = await Asset.findOne({ imei_no: ticket.imei_no });
+      
+      // SAFETY CHECK: If asset is null, allowedKeys is an empty array
+      var allowedKeys = asset ? Object.keys(asset.toObject()) : [];
+      allowedKeys = allowedKeys.concat(Object.keys(asset.metadata));
+
+      // Logic for the Missing Fields Array
+      const getTechnicalMissingFields = (missingArray) => {
+          // Check allowedKeys.length to ensure we have technical data to compare against
+          if (allowedKeys.length === 0) return []; 
+
+          return (missingArray || []).filter(fieldKey => 
+              allowedKeys.includes(fieldKey.toLowerCase()) && !["vehicle_no"].includes(fieldKey.toLowerCase())
+          );
+      };
+
+      // 2. Filter Mismatched Fields
+      const techMismatches = {};
+      if (allowedKeys.length > 0) {
+        Object.keys(ticket.error_data.mismatched_fields || {}).forEach(key => {
+          if (allowedKeys.includes(key) && !["vehicle_no"].includes(key)) techMismatches[key] = ticket.error_data.mismatched_fields[key];
+        });
+      }
+
+      // 3. Filter Suggested Data in Analysis
+      const techSuggestions = {};
+      if (allowedKeys.length > 0) {
+        Object.keys(ticket.analysis.suggested_data || {}).forEach(key => {
+          if (allowedKeys.includes(key) && !["vehicle_no"].includes(key)) techSuggestions[key] = ticket.analysis.suggested_data[key];
+        });
+      }
+
+      // Override original fields for the response
+      ticket.error_data.mismatched_fields = techMismatches;
+      ticket.analysis.suggested_data = techSuggestions;
+      ticket.error_data.missing_fields = getTechnicalMissingFields(ticket.error_data.missing_fields);
+      
+      // Redact sensitive message
+      ticket.error_data.error_message = "Technical Data Mismatch - Details Restricted"; 
+    }
+
+    res.json({ data: ticket });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server Error");
+  }
 });
 
 // 4. UPDATE: Update Status or Add Comments
@@ -197,7 +297,7 @@ router.put('/:id', authorize(['CMR', 'MANUFACTURER', 'ADMIN']), async (req, res)
 
         const role = req.user.role;
         const updates = req.body;
-
+        console.log(role);
         if (role === 'MANUFACTURER') {
             // 1. STRICT LOCK: Manufacturer can ONLY change these specific things
             const allowedStatus = ['MANUFACTURER_ANALYSIS', 'RESOLVED'];
@@ -207,7 +307,8 @@ router.put('/:id', authorize(['CMR', 'MANUFACTURER', 'ADMIN']), async (req, res)
                 ticket.status = updates.status;
             } else {
                 // Default forced status if they don't provide one or provide an illegal one
-                ticket.status = 'MANUFACTURER_ANALYSIS'; 
+                // ticket.status = 'MANUFACTURER_ANALYSIS';
+                return res.status(403).json({ error: "You are not allowed to move status other than resolved" }); 
             }
 
             // Only update the resolution field
@@ -238,7 +339,8 @@ router.put('/:id', authorize(['CMR', 'MANUFACTURER', 'ADMIN']), async (req, res)
 
         ticket.last_updated_time = Date.now();
         await ticket.save();
-        
+        runTicketAnalysis(newTicket);
+
         res.json({ message: "Update successful", data: ticket });
         
     } catch (err) {

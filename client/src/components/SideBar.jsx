@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Ticket, Box } from 'lucide-react';
+import { useState,useEffect } from 'react';
+import api from "../api";
 
 const SideNavItem = ({ icon, to, active }) => (
   <Link 
@@ -21,6 +23,22 @@ const SideNavItem = ({ icon, to, active }) => (
 const Sidebar = () => {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
+  const [isManufacturer,setIsManufacturer] = useState(false);
+
+   useEffect(() => {
+    // React's useEffect cannot be async itself, so we define a function inside
+    const fetchUserRole = async () => {
+      try {
+        const response = await api.get(`/users/me`); // Adjust endpoint as per your backend
+        const user = response.data?.user || response.data;
+        setIsManufacturer(user.role === "MANUFACTURER"?true:false);
+      } catch (error) {
+        console.error("Sidebar Auth Error:", error);
+      }
+    };
+
+    fetchUserRole();
+  }, []);
 
   return (
     <div className="fixed left-6 top-1/2 -translate-y-1/2 z-50">
@@ -34,7 +52,7 @@ const Sidebar = () => {
         
         <SideNavItem icon={<LayoutDashboard size={22}/>} to="/dashboard" active={isActive('/dashboard')} />
         <SideNavItem icon={<Ticket size={22}/>} to="/tickets" active={isActive('/tickets')} />
-        <SideNavItem icon={<Box size={22}/>} to="/assets" active={isActive('/assets')} />
+        {isManufacturer ?"":<SideNavItem icon={<Box size={22}/>} to="/assets" active={isActive('/assets')} />}
       </nav>
     </div>
   );

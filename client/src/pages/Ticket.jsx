@@ -12,6 +12,7 @@ const TicketList = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isManufacturer,setIsManufacturer] = useState(false);
 
   // UI States
   const [showFilters, setShowFilters] = useState(false);
@@ -34,6 +35,9 @@ const TicketList = () => {
         setLoading(true);
         const res = await api.get('/tickets');
         setTickets(res.data?.data ?? res.data ?? []);
+        const response = await api.get(`/users/me`);
+        const user = response.data?.user || response.data;
+        setIsManufacturer(user.role === "MANUFACTURER"?true:false);
       } catch (err) {
         setError("Unable to sync tickets.");
       } finally {
@@ -131,13 +135,13 @@ const TicketList = () => {
             </button>
           </div>
 
-          <button 
+          {isManufacturer ?<button 
             onClick={() => navigate('/tickets/new')}
             className="flex items-center gap-2 bg-[#0071e3] text-white px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-600 transition-all active:scale-95"
           >
             <Plus size={18} />
             New Ticket
-          </button>
+          </button> : ""}
         </div>
 
         {/* Table Container */}

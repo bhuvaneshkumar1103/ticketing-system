@@ -41,18 +41,36 @@ const SectionHeader = ({ title, icon: Icon }) => (
   </div>
 );
 
+const parseConversation = (text) => {
+  if (!text) return [];
+  // Splits the string by "User:" or "AI:" while keeping the markers
+  const parts = text.split(/(User:|AI:)/g).filter(p => p.trim() !== "");
+  const messages = [];
+
+  for (let i = 0; i < parts.length; i += 2) {
+    messages.push({
+      sender: parts[i].replace(":", "").trim(),
+      text: parts[i + 1]?.trim() || ""
+    });
+  }
+  return messages;
+};
 
 const TicketDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
+    const [isManufacturer,setIsManufacturer] = useState(false);
 
   useEffect(() => {
     const fetchDetails = async () => {
       try {
         const res = await api.get(`/tickets/${id}`);
         setTicket(res.data.data);
+        const response = await api.get(`/users/me`);
+        const user = response.data?.user || response.data;
+        setIsManufacturer(user.role === "MANUFACTURER"?true:false);
       } catch (err) {
         console.error(err);
       } finally {
@@ -105,11 +123,11 @@ const TicketDetail = () => {
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-blue-200 bg-white text-gray-600 hover:bg-blue-50 transition-all shadow-sm text-sm font-bold cursor-pointer">
             <Edit3 size={18} /> Edit
           </button>
-          <button 
+          {!isManufacturer ? <button 
           onClick={handleTicketDeleteTrigger}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-rose-100 bg-white text-rose-500 hover:bg-rose-50 transition-all shadow-sm text-sm font-bold cursor-pointer">
             <Trash2 size={18} /> Delete
-          </button>
+          </button> :""}
         </div>
       </div>
 
@@ -134,7 +152,7 @@ const TicketDetail = () => {
         <hr className="border-gray-100" />
 
         {/* Section: Source & Timeline */}
-        <section>
+       {!isManufacturer ?  <section>
           <SectionHeader title="Environment Details" icon={Calendar} />
           <div className="grid grid-cols-3 gap-8">
             <DataField label="Source Website" value={ticket.error_data?.source_website} />
@@ -142,7 +160,7 @@ const TicketDetail = () => {
             <DataField label="Reported Time" value={new Date(ticket.error_data?.timestamp).toLocaleString()} />
             <DataField label="Last Updated" value={new Date(ticket.last_updated_time).toLocaleString()} />
           </div>
-        </section>
+        </section> : ""}
 
         <hr className="border-gray-100" />
 
@@ -226,6 +244,80 @@ const TicketDetail = () => {
               <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
                 Manufacturer resolution pending
               </p>
+            </div>
+          )}
+          {/* Ticket Description Section */}
+          {/* {ticket.history && (
+            <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm space-y-3">
+              <div className="flex items-center gap-2 text-[#0071e3]">
+                <div className="w-1.5 h-4 bg-[#0071e3] rounded-full" />
+                <h3 className="text-[10px] font-black uppercase tracking-widest">General Description</h3>
+              </div>
+              
+              <div className="px-1">
+                <p className="text-gray-600 text-sm leading-relaxed font-medium">
+                  {ticket.history}
+                </p>
+              </div>
+            </div>
+          )} */}
+          {/* WhatsApp Style Chat History */}
+          {/* Professional Light Theme Chat History */}
+          {ticket.history && (
+            <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+              {/* Clean Header */}
+              <div className="px-6 py-4 border-b border-gray-50 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Interaction Log
+                  </h3>
+                </div>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                  {parseConversation(ticket.history).length} Messages
+                </span>
+              </div>
+
+              {/* Chat Body */}
+              <div className="p-6 space-y-6 max-h-[500px] overflow-y-auto flex flex-col bg-gray-50/30">
+                {parseConversation(ticket.history).map((msg, idx) => {
+                  const isUser = msg.sender === "User";
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
+                    >
+                      {/* Sender Label */}
+                      <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">
+                        {msg.sender}
+                      </span>
+
+                      {/* Message Bubble */}
+                      <div 
+                        className={`max-w-[80%] px-5 py-3 rounded-[22px] text-sm shadow-sm transition-all hover:shadow-md ${
+                          isUser 
+                            ? "bg-[#0071e3] text-white rounded-tr-none" // User: Signature Blue
+                            : "bg-white text-gray-700 border border-gray-100 rounded-tl-none" // AI: Clean White
+                        }`}
+                      >
+                        <p className="leading-relaxed font-medium whitespace-pre-wrap">
+                          {msg.text}
+                        </p>
+
+                        {/* Action Badge */}
+                        {msg.text.includes("[ACTION:RAISE_TICKET]") && (
+                          <div className={`mt-3 pt-2 border-t flex items-center gap-2 text-[10px] font-bold ${
+                            isUser ? "border-white/20 text-blue-100" : "border-gray-100 text-blue-600"
+                          }`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${isUser ? "bg-white" : "bg-blue-600"}`} />
+                            SYSTEM ESCALATION TRIGGERED
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

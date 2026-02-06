@@ -1,10 +1,32 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from './Sidebar';
-import { LogOut, User, ChevronDown } from 'lucide-react';
+import { LogOut, User, ChevronDown, Loader2 } from 'lucide-react';
+import api from '../api'; // Ensure this path points to your axios instance
 
-const MainLayout = ({ children, pageTitle, userName = "John Doe" }) => {
+const MainLayout = ({ children, pageTitle }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [userData, setUserData] = useState({ name: '', role: '' });
+  const [isLoading, setIsLoading] = useState(true);
   const dropdownRef = useRef(null);
+
+  // 1. Fetch real user identity
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await api.get('/users/me');
+        const user = res.data?.user || res.data;
+        setUserData({
+          name: user.name || 'User',
+          role: user.role || 'GUEST'
+        });
+      } catch (err) {
+        console.error("Layout Auth Error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -20,6 +42,16 @@ const MainLayout = ({ children, pageTitle, userName = "John Doe" }) => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.href = '/auth';
+  };
+
+  // Dynamic colors based on Role
+  const getRoleStyles = (role) => {
+    switch(role) {
+      case 'ADMIN': return 'text-purple-600 bg-purple-50';
+      case 'MANUFACTURER': return 'text-blue-600 bg-blue-50';
+      case 'CMR': return 'text-emerald-600 bg-emerald-50';
+      default: return 'text-gray-400 bg-gray-50';
+    }
   };
 
   return (
@@ -39,19 +71,27 @@ const MainLayout = ({ children, pageTitle, userName = "John Doe" }) => {
           {/* User Card with Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <div 
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              onClick={() => !isLoading && setIsDropdownOpen(!isDropdownOpen)}
               className={`flex items-center gap-3 bg-white px-5 py-2.5 rounded-2xl border transition-all cursor-pointer select-none ${
                 isDropdownOpen ? 'border-blue-200 shadow-md ring-4 ring-blue-50' : 'border-gray-100 shadow-sm hover:shadow-md'
               }`}
             >
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-bold text-gray-900 leading-none">{userName}</span>
-                <span className="text-[10px] text-gray-400 font-medium">Administrator</span>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-[#0071e3] flex items-center justify-center text-white text-sm font-bold shadow-blue-200 shadow-lg">
-                {userName.charAt(0)}
-              </div>
-              <ChevronDown size={14} className={`text-gray-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              {isLoading ? (
+                <Loader2 size={18} className="animate-spin text-blue-500 mr-2" />
+              ) : (
+                <>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs font-bold text-gray-900 leading-none">{userData.name}</span>
+                    <span className={`text-[9px] mt-1 px-2 py-0.5 rounded-md font-black uppercase tracking-wider ${getRoleStyles(userData.role)}`}>
+                      {userData.role}
+                    </span>
+                  </div>
+                  <div className="w-9 h-9 rounded-xl bg-[#0071e3] flex items-center justify-center text-white text-sm font-bold shadow-blue-200 shadow-lg">
+                    {userData.name.charAt(0).toUpperCase()}
+                  </div>
+                  <ChevronDown size={14} className={`text-gray-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                </>
+              )}
             </div>
 
             {/* Dropdown Menu */}

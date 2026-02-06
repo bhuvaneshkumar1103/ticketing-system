@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const TicketSchema = new mongoose.Schema({
     ticket_id: { type: Number, unique: true },
     imei_no: { type: String, required: true, index: true },
-    
+    history: {type: String},
     error_data: {
         source_website: String,
         error_message: String,
